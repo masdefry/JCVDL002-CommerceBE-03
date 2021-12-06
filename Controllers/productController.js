@@ -1,13 +1,13 @@
 const { db } = require('../Database/Connection')
 
 module.exports = {
-    getData:(req, res) => {
+    getData: (req, res) => {
         let scriptQuery = `Select * from product;`
         if (req.query.product_name){
-            let scriptQuery = `Select * from product where product_name = ${db.escape(req.query.product_name)}`
+            scriptQuery = `Select * from product where product_name = ${db.escape(req.query.product_name)}`
         }
-        db.query(scriptQuery,(err, result) => {
-            if(err) res.status(500).send(err)
+        db.query(scriptQuery, (err, result) => {
+            if (err) res.status(500).send(err)
             res.status(200).send(result)
         })
     },
@@ -29,7 +29,6 @@ module.exports = {
         for (let prop in req.body) {
             dataUpdate.push(`${prop} = ${db.escape(req.body[prop])}`)
         }
-
         let updateQuery = `UPDATE product set ${dataUpdate} where id = ${req.params.id}`
         db.query(updateQuery, (err, results)=>{
             if(err)req.status(500).send(err)
@@ -44,5 +43,5 @@ module.exports = {
             if(err)res.status(500).send(err)
             res.status(200).send(results)
         })
-    }
+    },
 };
