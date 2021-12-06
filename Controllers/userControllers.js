@@ -2,14 +2,16 @@
 const db = require("../Database/Connection");
 
 // Import hashPassword
-const hashPassword = require("../Helpers/Hash");
+const hashPassword = require("./../Helpers/Hash");
 
-const { createToken } = require("../Helpers/JWTSign");
+const createToken = require("./../Helpers/JWTSign");
 
 module.exports = {
   login: (req, res) => {
+    console.log("test");
     // Ambil data yang dikirim oleh user
     let data = req.body;
+    console.log(data);
 
     // Hash password
     data.password = hashPassword(data.password);
@@ -20,6 +22,7 @@ module.exports = {
     )} and password = ${db.escape(data.password)}`;
 
     db.query(scriptQuery, (err, result) => {
+      console.log(result);
       if (err) res.status(500).send(err);
       if (result[0]) {
         let {
