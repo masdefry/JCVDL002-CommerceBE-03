@@ -1,13 +1,18 @@
 // Initialize library
 const express = require("express");
-const app = express();
 const cors = require("cors");
+const bearerToken = require("express-bearer-token");
+
+const app = express();
 
 // Initialize cors
 app.use(cors());
 
 // Initialize body parser
 app.use(express.json());
+
+// Initialize bearer token
+app.use(bearerToken());
 
 // Initialize port
 const PORT = 2003;

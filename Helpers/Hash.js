@@ -6,7 +6,6 @@ function hashPassword(password) {
   hmac.update(password);
 
   let passwordHashed = hmac.digest("hex");
-  console.log(passwordHashed);
 
   return passwordHashed;
 }
