@@ -188,9 +188,8 @@ const register = async (req, res) => {
 };
 
 const verify = (req, res) => {
-  console.log(req.dataToken);
   let updateQuery = `UPDATE user SET verification_status = 1 WHERE id = ${db.escape(
-    req.dataToken.id
+    req.user.id
   )}`;
 
   db.query(updateQuery, (err, result) => {
