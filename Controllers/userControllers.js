@@ -6,54 +6,90 @@ const db = require("../Database/Connection");
 let transporter = require("../Helpers/Nodemailer");
 let query = util.promisify(db.query).bind(db);
 const dateTime = require("../Helpers/DateTime");
+require("dotenv").config();
 
 // Import hashPassword
 const hashPassword = require("./../Helpers/Hash");
 
+// Import create token
 const createToken = require("./../Helpers/JWTSign");
 
-const login = (req, res) => {
+const login = async (req, res) => {
   // Ambil data yang dikirim oleh user
   let data = req.body;
+  console.log(data);
 
   // Hash password
   data.password = hashPassword(data.password);
 
   // Cek usernama dan password sudah terdaftar atau belum
-  let scriptQuery = `SELECT * from user WHERE username = ${db.escape(
-    data.username
-  )} and password = ${db.escape(data.password)}`;
+  let scriptQuery = `SELECT * from user WHERE username = ? and password = ?`;
 
-  db.query(scriptQuery, (err, result) => {
-    if (err) res.status(500).send(err);
-    if (result[0]) {
-      let { id, username, email, user_role_id, verification_status } =
-        result[0];
+  try {
+    let getUserLogin = await query(scriptQuery, [
+      data.username,
+      data.password,
+    ]).catch((error) => {
+      throw error;
+    });
+    console.log(getUserLogin);
 
-      let token = createToken({
+    if (getUserLogin.length == 0) {
+      throw {
+        status: 400,
+        message: "Error username or password",
+        detail: "Your password and username does not match",
+      };
+    }
+
+    if (getUserLogin[0].verification_status === 0) {
+      throw {
+        status: 400,
+        message: "Account not verified",
+        detail:
+          "Your account has not been verified, please check your email and verify your account",
+      };
+    }
+
+    let { id, username, email, user_role_id } = getUserLogin;
+
+    await query("Start Transaction");
+
+    let token = createToken({
+      id,
+      username,
+      email,
+      user_role_id,
+    });
+
+    await query("Commit");
+    res.status(200).send({
+      data: {
         id,
         username,
         email,
         user_role_id,
+        token,
+      },
+      message: `You've been logged in successfully`,
+    });
+  } catch (error) {
+    await query("Rollback");
+    if (error.status) {
+      // Error yang dikirim oleh kita
+      res.status(error.status).send({
+        error: true,
+        message: error.message,
+        detail: error.detail,
       });
-      console.log(result, token);
-
-      if (verification_status == 0) {
-        res.status(200).send({ message: `Your account has not been verified` });
-      } else {
-        res.status(200).send({
-          data: {
-            id,
-            username,
-            email,
-            user_role_id,
-            token,
-          },
-          message: `You've been logged in successfully`,
-        });
-      }
+    } else {
+      // Error yang dikirim oleh server
+      res.status(500).send({
+        error: true,
+        message: error.message,
+      });
     }
-  });
+  }
 };
 
 const register = async (req, res) => {
@@ -139,7 +175,7 @@ const register = async (req, res) => {
 
     // Konfigurasi untuk kirim email verifikasi
     let mail = {
-      from: `Admin <crimsonlord13@gmail.com`,
+      from: `Admin ${process.env.USER_EMAIL}`,
       to: `${email}`,
       subject: `Account Verification`,
       html: `<a href='http://localhost:3000/verification/${token}'>Click here to verify your account</a>`,
@@ -188,18 +224,137 @@ const register = async (req, res) => {
 };
 
 const verify = (req, res) => {
+  let { id, username, email, user_role_id } = req.user;
+
   let updateQuery = `UPDATE user SET verification_status = 1 WHERE id = ${db.escape(
-    req.user.id
+    id
   )}`;
 
   db.query(updateQuery, (err, result) => {
     if (err) res.status(500).send(err);
 
+    let token = createToken({
+      id,
+      username,
+      email,
+      user_role_id,
+    });
+
     res.status(200).send({
       message: "Your account has been verified",
       success: true,
+      token,
     });
   });
 };
 
-module.exports = { login, register, verify };
+const changePassword = async (req, res) => {
+  let password = req.body.password;
+
+  let query1 = "UPDATE user SET password = ? WHERE id = ?";
+
+  password = hashPassword(password);
+  await query("Start Transaction");
+  try {
+    let updateUserData = await query(query1, [password, req.user.id]).catch(
+      (error) => {
+        throw error;
+      }
+    );
+    await query("Commit");
+    res.status(200).send({
+      error: false,
+      message: "Change Password Success",
+      data: {
+        id: req.user.id,
+        email: req.user.email,
+        user_role_id: req.user.user_role_id,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    if (error.status) {
+      res.status(error.status).send({
+        error: true,
+        message: error.message,
+        detail: error.detail,
+      });
+    } else {
+      res.status(500).send({
+        error: true,
+        message: error.message,
+      });
+    }
+  }
+};
+
+const forgetPassword = async (req, res) => {
+  let query1 = `SELECT * FROM user WHERE email = ?`;
+
+  try {
+    let getUserData = await query(query1, req.body.email).catch((error) => {
+      throw error;
+    });
+
+    if (getUserData.length == 0) {
+      throw {
+        status: 400,
+        message: "Error",
+        detail: "Email is not valid or has not been registered",
+      };
+    }
+
+    await query("Start Transaction");
+
+    let { id, username, email, user_role_id } = getUserData[0];
+
+    let token = createToken({
+      id,
+      username,
+      email,
+      user_role_id,
+    });
+
+    // Konfigurasi untuk kirim email lupa password
+    let mail = {
+      from: `Admin ${process.env.USER_EMAIL}`,
+      to: `${getUserData[0].email}`,
+      subject: `Change Password`,
+      html: `<a href='http://localhost:3000/change-password/${token}'>Click here to change your current password</a>`,
+    };
+
+    // Kirim email ganti password
+    transporter.sendMail(mail, (errMail, resMail) => {
+      if (errMail) {
+        res.status(500).send({
+          message: "Reset password failed",
+          success: false,
+          err: errMail,
+        });
+      }
+    });
+
+    await query("Commit");
+    res.status(200).send({
+      error: false,
+      message: "Email Sent",
+      detail:
+        "Email has been sent, please check your email and click the link attached to reset your password",
+    });
+  } catch (error) {
+    if (error.status) {
+      res.status(error.status).send({
+        error: true,
+        message: error.message,
+        detail: error.detail,
+      });
+    } else {
+      res.status(500).send({
+        error: true,
+        message: error.message,
+      });
+    }
+  }
+};
+
+module.exports = { login, register, verify, changePassword, forgetPassword };
