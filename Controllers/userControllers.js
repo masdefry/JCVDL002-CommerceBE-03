@@ -51,7 +51,7 @@ const login = async (req, res) => {
       };
     }
 
-    let { id, username, email, user_role_id } = getUserLogin;
+    let { id, username, email, user_role_id } = getUserLogin[0];
 
     await query("Start Transaction");
 
@@ -96,11 +96,9 @@ const register = async (req, res) => {
   let data = req.body;
 
   // Cek jika email sudah didaftarkan
-  let query1 = "SELECT * FROM user WHERE email = ?";
+  let query1 = "SELECT id FROM user WHERE email = ? and username = ?";
   // Input data ke db
   let query2 = "INSERT INTO user SET ?";
-  // Select data yang sudah di register untuk membuat jwt token
-  let query3 = "SELECT * from user WHERE id = ?";
 
   try {
     // Validasi
@@ -108,32 +106,34 @@ const register = async (req, res) => {
       throw {
         status: 400,
         message: "Error",
-        detail: "Data tidak boleh kosong",
+        detail: "Data cannot be empty",
       };
     if (data.username.length < 6)
       throw {
         status: 400,
         message: "Error",
-        detail: "Username minimal 6 karakter",
+        detail: "Username should have minimum character length 6",
       };
     if (data.password.length < 6)
       throw {
         status: 400,
         message: "Error",
-        detail: "Password minimal 6 karakter",
+        detail: "Password should have minimum character length 6",
       };
 
     await query("Start Transaction");
 
-    // Cek email jika sudah ada di db
-    const checkEmail = await query(query1, data.email).catch((error) => {
-      throw error;
-    });
+    // Cek email dan username jika sudah ada di db
+    const checkEmail = await query(query1, [data.email, data.username]).catch(
+      (error) => {
+        throw error;
+      }
+    );
     if (checkEmail.length > 0)
       throw {
         status: 400,
         message: "Error Validation",
-        detail: "Email Sudah Terdaftar",
+        detail: "Email and username has been registered",
       };
 
     // Hash password
@@ -149,22 +149,14 @@ const register = async (req, res) => {
       verification_status: 0,
       user_role_id: 3,
     };
-    console.log(dataToSend);
 
     // Input data user ke db
     const registerData = await query(query2, dataToSend).catch((error) => {
       throw error;
     });
 
-    // Ambil kembali data yang sudah di input untuk membuat jwt token
-    const getRegisterData = await query(query3, registerData.insertId).catch(
-      (error) => {
-        throw error;
-      }
-    );
-    console.log(getRegisterData);
-
-    let { id, username, email, user_role_id } = getRegisterData[0];
+    let { username, email, user_role_id } = dataToSend;
+    let id = registerData.insertId;
 
     let token = createToken({
       id,
@@ -183,25 +175,17 @@ const register = async (req, res) => {
 
     // Kirim email verifikasi
     transporter.sendMail(mail, (errMail, resMail) => {
-      if (errMail) {
-        res.status(500).send({
-          message: "Registration failed",
-          success: false,
-          err: errMail,
-        });
-      }
+      console.log(errMail);
     });
 
     await query("Commit");
     res.status(200).send({
       error: false,
       message: "Register Success",
-      detail: "Akun Anda Berhasil Terdaftar!",
+      detail:
+        "Your account has been registered, please check your email to verify your account",
       data: {
-        id: getRegisterData[0].id,
-        username: getRegisterData[0].username,
-        email: getRegisterData[0].email,
-        token: token,
+        token,
       },
     });
   } catch (error) {
@@ -254,14 +238,18 @@ const changePassword = async (req, res) => {
   let query1 = "UPDATE user SET password = ? WHERE id = ?";
 
   password = hashPassword(password);
+
   await query("Start Transaction");
+
   try {
     let updateUserData = await query(query1, [password, req.user.id]).catch(
       (error) => {
         throw error;
       }
     );
+
     await query("Commit");
+
     res.status(200).send({
       error: false,
       message: "Change Password Success",
@@ -272,19 +260,10 @@ const changePassword = async (req, res) => {
       },
     });
   } catch (error) {
-    console.log(error);
-    if (error.status) {
-      res.status(error.status).send({
-        error: true,
-        message: error.message,
-        detail: error.detail,
-      });
-    } else {
-      res.status(500).send({
-        error: true,
-        message: error.message,
-      });
-    }
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
   }
 };
 
@@ -357,4 +336,55 @@ const forgetPassword = async (req, res) => {
   }
 };
 
-module.exports = { login, register, verify, changePassword, forgetPassword };
+const getUser = async (req, res) => {
+  const scriptQuery = `SELECT id, email, username, user_role_id FROM user WHERE id = ?`;
+
+  try {
+    let getUserData = await query(scriptQuery, req.user.id).catch((err) => {
+      throw err;
+    });
+
+    if (getUserData.length == 0) {
+      throw {
+        status: 400,
+        message: "Error",
+        detail: "User has not been registered",
+      };
+    }
+
+    let { id, email, username, user_role_id } = getUserData[0];
+
+    res.status(200).send({
+      error: false,
+      message: "Get user data success",
+      data: {
+        id,
+        username,
+        email,
+        user_role_id,
+      },
+    });
+  } catch (error) {
+    if (error.status) {
+      res.status(error.status).send({
+        error: true,
+        message: error.message,
+        detail: error.detail,
+      });
+    } else {
+      res.status(500).send({
+        error: true,
+        message: error.message,
+      });
+    }
+  }
+};
+
+module.exports = {
+  login,
+  register,
+  verify,
+  changePassword,
+  forgetPassword,
+  getUser,
+};
