@@ -6,7 +6,6 @@ const db = require("../Database/Connection");
 let transporter = require("../Helpers/Nodemailer");
 let query = util.promisify(db.query).bind(db);
 const dateTime = require("../Helpers/DateTime");
-require("dotenv").config();
 
 // Import hashPassword
 const hashPassword = require("./../Helpers/Hash");
@@ -74,7 +73,6 @@ const login = async (req, res) => {
       message: `You've been logged in successfully`,
     });
   } catch (error) {
-    await query("Rollback");
     if (error.status) {
       // Error yang dikirim oleh kita
       res.status(error.status).send({
@@ -96,7 +94,7 @@ const register = async (req, res) => {
   let data = req.body;
 
   // Cek jika email sudah didaftarkan
-  let query1 = "SELECT id FROM user WHERE email = ? and username = ?";
+  let query1 = "SELECT id FROM user WHERE email = ? or username = ?";
   // Input data ke db
   let query2 = "INSERT INTO user SET ?";
 
@@ -189,7 +187,6 @@ const register = async (req, res) => {
       },
     });
   } catch (error) {
-    await query("Rollback");
     if (error.status) {
       // Error yang dikirim oleh kita
       res.status(error.status).send({
@@ -233,6 +230,68 @@ const verify = (req, res) => {
 };
 
 const changePassword = async (req, res) => {
+  let oldPassword = req.body.oldPassword;
+  let newPassword = req.body.newPassword;
+
+  let query1 = `SELECT id, username from user WHERE id = ? and password = ?`;
+  let query2 = `UPDATE user SET password = ? WHERE id = ?`;
+
+  oldPassword = hashPassword(oldPassword);
+  newPassword = hashPassword(newPassword);
+
+  try {
+    let checkOldPassword = await query(query1, [
+      req.user.id,
+      oldPassword,
+    ]).catch((error) => {
+      throw error;
+    });
+
+    if (checkOldPassword.length == 0) {
+      throw {
+        status: 400,
+        message: "Error Verification",
+        detail: "Wrong old password",
+      };
+    }
+
+    await query("Start Transaction");
+    let updateUserData = await query(query2, [newPassword, req.user.id]).catch(
+      (error) => {
+        throw error;
+      }
+    );
+
+    await query("Commit");
+
+    res.status(200).send({
+      error: false,
+      message: "Change Password Success",
+      data: {
+        id: req.user.id,
+        email: req.user.email,
+        user_role_id: req.user.user_role_id,
+      },
+    });
+  } catch (error) {
+    if (error.status) {
+      // Error yang dikirim oleh kita
+      res.status(error.status).send({
+        error: true,
+        message: error.message,
+        detail: error.detail,
+      });
+    } else {
+      // Error yang dikirim oleh server
+      res.status(500).send({
+        error: true,
+        message: error.message,
+      });
+    }
+  }
+};
+
+const verifyForgetPassword = async (req, res) => {
   let password = req.body.password;
 
   let query1 = "UPDATE user SET password = ? WHERE id = ?";
@@ -299,7 +358,7 @@ const forgetPassword = async (req, res) => {
       from: `Admin ${process.env.USER_EMAIL}`,
       to: `${getUserData[0].email}`,
       subject: `Change Password`,
-      html: `<a href='http://localhost:3000/change-password/${token}'>Click here to change your current password</a>`,
+      html: `<a href='http://localhost:3000/verify-forget-password/${token}'>Click here to change your current password</a>`,
     };
 
     // Kirim email ganti password
@@ -385,6 +444,7 @@ module.exports = {
   register,
   verify,
   changePassword,
+  verifyForgetPassword,
   forgetPassword,
   getUser,
 };
