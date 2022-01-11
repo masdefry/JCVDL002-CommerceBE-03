@@ -6,11 +6,12 @@ const db = require("../Database/Connection");
 let query = util.promisify(db.query).bind(db);
 
 const getCart = async (req, res) => {
-  let scriptQuery = `SELECT c.id as id, qty, product_name, product_price, stock, gender, category FROM cart c JOIN user u 
-  ON c.user_id = u.id JOIN product p 
-  ON c.id_produk = p.id JOIN gender g 
-  ON p.gender_id = g.id JOIN category cg
-  ON p.category_id = cg.id WHERE user_id = ?`;
+  let scriptQuery = `SELECT c.id, qty, product_name, id_produk, product_price, stock, gender, category, image FROM cart c JOIN user u
+ON c.user_id = u.id JOIN product p
+ON c.id_produk = p.id JOIN gender g
+ON p.gender_id = g.id JOIN category cg
+ON p.category_id = cg.id JOIN product_image pi
+ON p.id = pi.id_product WHERE c.user_id = ? group by p.product_name ;`;
 
   try {
     let getUserCart = await query(scriptQuery, req.user.id).catch((error) => {
@@ -68,7 +69,7 @@ const editCart = async (req, res) => {
 
     res.status(200).send({
       message: "Quantity has been updated",
-      editCartData,
+      qty: data.qty,
     });
   } catch (error) {
     res.status(500).send({
@@ -99,4 +100,9 @@ const deleteCart = async (req, res) => {
   }
 };
 
-module.exports = { getCart, addToCart, editCart, deleteCart };
+module.exports = {
+  getCart,
+  addToCart,
+  editCart,
+  deleteCart
+};
