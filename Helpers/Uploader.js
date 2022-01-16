@@ -3,41 +3,39 @@ const fs = require("fs");
 
 module.exports = {
   uploader: (directory, fileNamePrefix) => {
-    // Lokasi penyimpanan file
-    let defaultDir = "../Public";
+    //lokasi penyimpanan gambar
+    let defaultDir = "./Public/Images";
 
-    // diskStorage untuk menyimpan file dari front end ke directory back end
+    //konfigurasi storage
     const storage = multer.diskStorage({
       destination: (req, file, cb) => {
         const pathDir = defaultDir + directory;
-
-        // Pengecekan jika directory yang dituju sudah ada atau belum
         if (fs.existsSync(pathDir)) {
-          console.log("Directory ada");
           cb(null, pathDir);
         } else {
-          fs.mkdir(pathDir, { recursive: true }, (err) => {
-            cb(err, pathDir);
-          });
+          fs.mkdir(pathDir, { recursive: true }, (err) => cb(err, pathDir));
         }
-        filename: (req, file, cb) => {
-          let ext = file.originalname.split(".");
-          let filename =
-            fileNamePrefix + Data.now() + "." + ext[ext.length - 1];
-          cb(null, filename);
-        };
+      },
+
+      //rename nama file
+      filename: (req, file, cb) => {
+        let ext = file.originalname.split(".");
+        let filename =
+          fileNamePrefix + "_" + Date.now() + "." + ext[ext.length - 1];
+
+        cb(null, filename);
       },
     });
+
+    /**Konfigurasi jenis file */
     const fileFilter = (req, file, cb) => {
-      const ext = /\.(jpg|jpeg|png|pdf|JPG|PNG|JPEG|PDF)/;
+      const ext = /\.(jpg|jpeg|png|JPG|PNG|JPEG)/;
       if (!file.originalname.match(ext)) {
-        return cb(
-          new Error("You cannot upload file with this file type"),
-          false
-        );
+        return cb(new Error("Your file type are denied"), false);
       }
       cb(null, true);
     };
+
     return multer({
       storage,
       fileFilter,

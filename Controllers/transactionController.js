@@ -124,6 +124,8 @@ const addTransaction = async (req, res) => {
     await query("Commit");
     res.status(200).send({
       message: "Transaction has been added, waiting for payment",
+      transaction_id: addTransactionData.insertId,
+      status_id: 1,
     });
   } catch (error) {
     await query("Rollback");

@@ -31,22 +31,52 @@ ON p.id = pi.id_product WHERE c.user_id = ? group by p.product_name ;`;
 
 const addToCart = async (req, res) => {
   let data = req.body;
-  let scriptQuery = `INSERT INTO cart SET ?`;
+
+  // Cek apakah produk sudah ada di cart
+  let scriptQuery = `SELECT id, qty FROM cart WHERE id_produk = ? AND user_id = ?`;
+
+  // Jika produk sudah ada di cart, maka tambahkan qty
+  let scriptQuery1 = `UPDATE cart SET qty = ? WHERE id = ?`;
+
+  // Jika produk tidak ada di cart, maka tambahkan produk
+  let scriptQuery2 = `INSERT INTO cart SET ?`;
 
   try {
-    let dataToSend = {
-      qty: data.qty,
-      user_id: req.user.id,
-      id_produk: data.product_id,
-    };
+    let { qty, product_id } = data;
 
-    const addCartData = await query(scriptQuery, dataToSend).catch((err) => {
+    const findCartData = await query(scriptQuery, [
+      product_id,
+      req.user.id,
+    ]).catch((err) => {
       throw err;
     });
 
-    res.status(200).send({
-      message: "Item has been added to cart",
-    });
+    if (findCartData.length) {
+      let editCartQty = await query(scriptQuery1, [
+        findCartData[0].qty + qty,
+        findCartData[0].id,
+      ]).catch((err) => {
+        throw err;
+      });
+
+      res.status(200).send({
+        message: "Item has been added to cart",
+      });
+    } else {
+      let dataToSend = {
+        qty: qty,
+        user_id: req.user.id,
+        id_produk: product_id,
+      };
+
+      const addCartData = await query(scriptQuery2, dataToSend).catch((err) => {
+        throw err;
+      });
+
+      res.status(200).send({
+        message: "Item has been added to cart",
+      });
+    }
   } catch (error) {
     res.status(500).send({
       error: true,
@@ -104,5 +134,5 @@ module.exports = {
   getCart,
   addToCart,
   editCart,
-  deleteCart
+  deleteCart,
 };

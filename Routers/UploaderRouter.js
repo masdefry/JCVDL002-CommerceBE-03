@@ -4,6 +4,6 @@ const routers = express.Router();
 
 const jwtVerify = require("./../Middleware/JWTVerify");
 
-routers.post("/", jwtVerify, uploaderController.uploadFile);
+routers.post("/payment", jwtVerify, uploaderController.uploadPayment);
 
 module.exports = routers;

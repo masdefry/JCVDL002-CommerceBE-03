@@ -15,7 +15,6 @@ const createToken = require("./../Helpers/JWTSign");
 const login = async (req, res) => {
   // Ambil data yang dikirim oleh user
   let data = req.body;
-  console.log(data);
 
   // Hash password
   data.password = hashPassword(data.password);
@@ -30,7 +29,6 @@ const login = async (req, res) => {
     ]).catch((error) => {
       throw error;
     });
-    console.log(getUserLogin);
 
     if (getUserLogin.length == 0) {
       throw {
@@ -44,16 +42,12 @@ const login = async (req, res) => {
       throw {
         status: 400,
         message: "Account not verified",
-        detail: "Your account has not been verified, please check your email and verify your account",
+        detail:
+          "Your account has not been verified, please check your email and verify your account",
       };
     }
 
-    let {
-      id,
-      username,
-      email,
-      user_role_id
-    } = getUserLogin[0];
+    let { id, username, email, user_role_id } = getUserLogin[0];
 
     await query("Start Transaction");
 
@@ -109,18 +103,6 @@ const register = async (req, res) => {
         message: "Error",
         detail: "Data cannot be empty",
       };
-    if (data.username.length < 6)
-      throw {
-        status: 400,
-        message: "Error",
-        detail: "Username should have minimum character length 6",
-      };
-    if (data.password.length < 6)
-      throw {
-        status: 400,
-        message: "Error",
-        detail: "Password should have minimum character length 6",
-      };
 
     await query("Start Transaction");
 
@@ -156,11 +138,7 @@ const register = async (req, res) => {
       throw error;
     });
 
-    let {
-      username,
-      email,
-      user_role_id
-    } = dataToSend;
+    let { username, email, user_role_id } = dataToSend;
     let id = registerData.insertId;
 
     let token = createToken({
@@ -187,7 +165,8 @@ const register = async (req, res) => {
     res.status(200).send({
       error: false,
       message: "Register Success",
-      detail: "Your account has been registered, please check your email to verify your account",
+      detail:
+        "Your account has been registered, please check your email to verify your account",
       data: {
         token,
       },
@@ -211,12 +190,7 @@ const register = async (req, res) => {
 };
 
 const verify = (req, res) => {
-  let {
-    id,
-    username,
-    email,
-    user_role_id
-  } = req.user;
+  let { id, username, email, user_role_id } = req.user;
 
   let updateQuery = `UPDATE user SET verification_status = 1 WHERE id = ${db.escape(
     id
@@ -355,12 +329,7 @@ const forgetPassword = async (req, res) => {
 
     await query("Start Transaction");
 
-    let {
-      id,
-      username,
-      email,
-      user_role_id
-    } = getUserData[0];
+    let { id, username, email, user_role_id } = getUserData[0];
 
     let token = createToken({
       id,
@@ -392,7 +361,8 @@ const forgetPassword = async (req, res) => {
     res.status(200).send({
       error: false,
       message: "Email Sent",
-      detail: "Email has been sent, please check your email and click the link attached to reset your password",
+      detail:
+        "Email has been sent, please check your email and click the link attached to reset your password",
     });
   } catch (error) {
     if (error.status) {
@@ -426,12 +396,7 @@ const getUser = async (req, res) => {
       };
     }
 
-    let {
-      id,
-      email,
-      username,
-      user_role_id
-    } = getUserData[0];
+    let { id, email, username, user_role_id } = getUserData[0];
 
     res.status(200).send({
       error: false,
