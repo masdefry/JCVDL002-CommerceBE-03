@@ -1,3 +1,4 @@
+const { get } = require("express/lib/response");
 const util = require("util");
 
 // Import connection
@@ -38,8 +39,11 @@ const addTransaction = async (req, res) => {
   // Insert ke table transaction_status (transaction_id, transaction_date, status_id)
   let scriptQuery4 = `INSERT INTO transaction_status SET ?`;
 
-  // Hapus data dari table cart
-  let scriptQuery5 = `DELETE FROM cart WHERE id = ?`;
+  // Ambil data stock dari tabel produk
+  let scriptQuery6 = `SELECT stock FROM product WHERE id = ?`;
+
+  // Kurangi stock dari tabel product
+  let scriptQuery7 = `UPDATE product SET stock = ? WHERE id = ?`;
 
   const dt = new Date();
   dt.setTime(dt.getTime() + 24 * 60 * 60 * 1000);
@@ -63,28 +67,42 @@ const addTransaction = async (req, res) => {
     // Loop untuk mengurangi stok produk di warehouse dan hapus data cart dari table
     for (let i = 0; i < data.cart.length; i++) {
       // Ambil stok produk di warehouse
-      let getProductStock = await query(scriptQuery, [
+      let getWarehouseStock = await query(scriptQuery, [
         data.cart[i].id_produk,
         data.warehouseId,
       ]);
-      console.log("getProductStock:", getProductStock);
+      console.log("getWarehouseStock:", getWarehouseStock);
       console.log("cartQty", data.cart[i]);
 
-      // Kurangi stok produk di warehouse
-      let updateProductStock = await query(scriptQuery1, [
-        getProductStock[0].stock - data.cart[i].qty,
+      // Jika stock produk di warehouse kosong, ambil stok dari warehouse lain
+      if (!getWarehouseStock.length) {
+        getWarehouseStock = await query(scriptQuery, [
+          data.cart[i].id_produk,
+          data.warehouseId + 1,
+        ]);
+
+        data.warehouseId += 1;
+      }
+
+      // Kurangi stok produk di table warehouse
+      let updateWarehouseStock = await query(scriptQuery1, [
+        getWarehouseStock[0].stock - data.cart[i].qty,
         data.cart[i].id_produk,
         data.warehouseId,
       ]).catch((err) => {
         throw err;
       });
 
-      // Hapus data dari table cart
-      let deleteCartData = await query(scriptQuery5, data.cart[i].id).catch(
-        (err) => {
-          throw err;
-        }
-      );
+      // Ambil stock produk dari table produk
+      let getProductStock = await query(scriptQuery6, [data.cart[i].id_produk]);
+
+      // Kurangi stok produk di tabel product
+      let updateProductStock = await query(scriptQuery7, [
+        getProductStock[0].stock - data.cart[i].qty,
+        data.cart[i].id_produk,
+      ]).catch((err) => {
+        throw err;
+      });
     }
 
     // Insert ke table transaction
@@ -93,6 +111,8 @@ const addTransaction = async (req, res) => {
         throw err;
       }
     );
+
+    console.log(addTransactionData.insertId);
 
     // Loop untuk insert data produk ke transaction detail
     for (let i = 0; i < data.cart.length; i++) {
