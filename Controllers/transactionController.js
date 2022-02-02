@@ -157,6 +157,99 @@ const addTransaction = async (req, res) => {
   }
 };
 
+const getOngoingTransaction = async (req, res) => {
+  // Ambil data transaction user yang menunggu verifikasi
+  let scriptQuery = `SELECT ts.id, total_price, t.id as transaction_id, transaction_date, proof FROM transaction t JOIN transaction_status ts ON t.id = ts.transaction_id 
+  JOIN payment_proof p ON p.transaction_id = t.id WHERE ts.status_id = 2`;
+
+  try {
+    let getOngoingData = await query(scriptQuery).catch((err) => {
+      throw err;
+    });
+
+    res.status(200).send({
+      data: [...getOngoingData],
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
+  }
+};
+
+const verifyPayment = async (req, res) => {
+  let { transaction_id, status_id, id } = req.body;
+
+  // Jika payment di accept atau ditolak
+  let scriptQuery = `INSERT INTO transaction_status SET ?`;
+
+  // Hapus transaction status menunggu verifikasi
+  let scriptQuery1 = `DELETE FROM transaction_status WHERE id = ?`;
+
+  const d = new Date();
+
+  try {
+    let insertTransactionStatus = await query(scriptQuery, {
+      transaction_id,
+      status_id,
+      transaction_date: new Date(),
+    }).catch((err) => {
+      throw err;
+    });
+
+    let deteleTransactionStatus = await query(scriptQuery1, id).catch((err) => {
+      throw err;
+    });
+
+    res.status(200).send({
+      message: "Payment verification success",
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
+  }
+};
+
+const getTransactionUser = async (req, res) => {
+  let scriptQuery = `SELECT t.id, total_product_price, shipping_cost, total_price, transaction_date FROM transaction t JOIN transaction_status ts ON t.id = ts.transaction_id WHERE user_id = ? AND ts.status_id = 3`;
+
+  let scriptQuery1 = `SELECT td.product_name, product_qty, price FROM transaction_details td JOIN product p ON td.product_name = p.product_name WHERE td.transaction_id = ?`;
+
+  try {
+    let getTransactionData = await query(scriptQuery, req.user.id).catch(
+      (err) => {
+        throw err;
+      }
+    );
+
+    for (let i = 0; i < getTransactionData.length; i++) {
+      let getTransactionDetail = await query(
+        scriptQuery1,
+        getTransactionData[i].id
+      ).catch((err) => {
+        throw err;
+      });
+      getTransactionData[i].transaction_detail = getTransactionDetail;
+    }
+
+    res.status(200).send({
+      data: getTransactionData,
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
+  }
+};
 module.exports = {
   addTransaction,
+  getTransactionUser,
+  getOngoingTransaction,
+  verifyPayment,
 };

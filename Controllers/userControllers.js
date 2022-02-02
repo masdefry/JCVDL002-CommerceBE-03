@@ -104,8 +104,6 @@ const register = async (req, res) => {
         detail: "Data cannot be empty",
       };
 
-    await query("Start Transaction");
-
     // Cek email dan username jika sudah ada di db
     const checkEmail = await query(query1, [data.email, data.username]).catch(
       (error) => {
@@ -118,6 +116,8 @@ const register = async (req, res) => {
         message: "Error Validation",
         detail: "Email and username has been registered",
       };
+
+    await query("Start Transaction");
 
     // Hash password
     let passwordHashed = hashPassword(data.password);

@@ -16,13 +16,15 @@ const getProducts = async (req, res) => {
   }
 
   // Untuk mengambil data produk
-  let scriptQuery = `SELECT p.id, product_name, product_price, category_id, gender_id, stock, image FROM product p JOIN product_image pi ON p.id = pi.id_product GROUP BY p.id `;
+  let scriptQuery = `SELECT p.id, product_name, product_price, category_id, gender_id, stock, image, detail_product FROM product p JOIN product_image pi ON p.id = pi.id_product GROUP BY p.id `;
 
   try {
     let getDataProducts = await query(scriptQuery, []);
 
     const filterProducts = getDataProducts.filter((product) => {
-      if (category && gender) {
+      if (!category && !gender && !searchName) {
+        return product;
+      } else if (category && gender) {
         return (
           product.product_name
             .toLowerCase()
@@ -95,7 +97,7 @@ const getProducts = async (req, res) => {
 };
 
 const getProductById = async (req, res) => {
-  let scriptQuery = `SELECT id, product_name, product_price, detail_product, stock FROM product WHERE id = ?`;
+  let scriptQuery = `SELECT id, product_name, product_price, detail_product, stock, gender_id, category_id FROM product WHERE id = ?`;
 
   let scriptQuery1 = `SELECT image FROM product_image WHERE id_product = ?`;
 
@@ -120,7 +122,124 @@ const getProductById = async (req, res) => {
   }
 };
 
+const addProduct = async (req, res) => {
+  let {
+    product_name,
+    product_price,
+    category_id,
+    gender_id,
+    stock,
+    detail_product,
+  } = req.body;
+
+  let scriptQuery = `INSERT INTO product SET ?`;
+
+  let dataToSend = {
+    product_name,
+    product_price,
+    category_id,
+    gender_id,
+    stock,
+    detail_product,
+  };
+
+  try {
+    let inputDataProduct = await query(scriptQuery, dataToSend).catch((err) => {
+      throw err;
+    });
+    res.status(200).send({
+      message: "Product has been added to database",
+      id_product: inputDataProduct.insertId,
+    });
+  } catch (error) {
+    if (error.status) {
+      // Error yang dikirim oleh kita
+      res.status(error.status).send({
+        error: true,
+        message: error.message,
+      });
+    } else {
+      // Error yang dikirim oleh server
+      console.log(error);
+      res.status(500).send({
+        error: true,
+        message: error.message,
+      });
+    }
+  }
+};
+
+const editProduct = async (req, res) => {
+  let {
+    product_name,
+    product_price,
+    category_id,
+    gender_id,
+    stock,
+    detail_product,
+  } = req.body;
+
+  let scriptQuery = `UPDATE product SET ? WHERE id = ?`;
+
+  let dataToSend = {
+    product_name,
+    product_price,
+    category_id,
+    gender_id,
+    stock,
+    detail_product,
+  };
+
+  try {
+    let editDataProduct = await query(scriptQuery, [
+      dataToSend,
+      req.params.id,
+    ]).catch((err) => {
+      throw err;
+    });
+    res.status(200).send({
+      message: "Product has been edited",
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
+  }
+};
+
+const deleteProduct = async (req, res) => {
+  let scriptQuery = `DELETE FROM product_image WHERE id_product = ?`;
+  let scriptQuery1 = `DELETE FROM product WHERE id = ?`;
+
+  try {
+    let deleteProductImage = await query(scriptQuery, req.params.id).catch(
+      (err) => {
+        throw err;
+      }
+    );
+    let deleteProductData = await query(scriptQuery1, req.params.id).catch(
+      (err) => {
+        throw err;
+      }
+    );
+
+    res.status(200).send({
+      message: "Product has been deleted",
+    });
+  } catch (error) {
+    console.log(error);
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
+  }
+};
+
 module.exports = {
   getProducts,
   getProductById,
+  addProduct,
+  editProduct,
+  deleteProduct,
 };
