@@ -6,7 +6,9 @@ const db = require("../Database/Connection");
 let query = util.promisify(db.query).bind(db);
 
 const getUserProfile = async (req, res) => {
-  const scriptQuery = `SELECT username, email, phone, verification_status, first_name, last_name, birthdate, gender, user_role_id FROM user u LEFT JOIN user_profile up ON up.user_id = u.id WHERE u.id = ?`;
+  const scriptQuery = `SELECTSELECT username, email, phone, verification_status, first_name, last_name, birthdate, 
+gender, role FROM user u JOIN user_role ur ON u.user_role_id = ur.id
+JOIN user_profile up ON u.id = up.user_WHERE u.id = ?`;
 
   try {
     await query("Start Transaction");

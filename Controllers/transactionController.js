@@ -66,32 +66,32 @@ const addTransaction = async (req, res) => {
 
     // Loop untuk mengurangi stok produk di warehouse dan hapus data cart dari table
     for (let i = 0; i < data.cart.length; i++) {
-      // Ambil stok produk di warehouse
-      let getWarehouseStock = await query(scriptQuery, [
-        data.cart[i].id_produk,
-        data.warehouseId,
-      ]);
-      console.log("getWarehouseStock:", getWarehouseStock);
-      console.log("cartQty", data.cart[i]);
+      // // Ambil stok produk di warehouse
+      // let getWarehouseStock = await query(scriptQuery, [
+      //   data.cart[i].id_produk,
+      //   data.warehouseId,
+      // ]);
+      // console.log("getWarehouseStock:", getWarehouseStock);
+      // console.log("cartQty", data.cart[i]);
 
-      // Jika stock produk di warehouse kosong, ambil stok dari warehouse lain
-      if (!getWarehouseStock.length) {
-        getWarehouseStock = await query(scriptQuery, [
-          data.cart[i].id_produk,
-          data.warehouseId + 1,
-        ]);
+      // // Jika stock produk di warehouse kosong, ambil stok dari warehouse lain
+      // if (!getWarehouseStock.length) {
+      //   getWarehouseStock = await query(scriptQuery, [
+      //     data.cart[i].id_produk,
+      //     data.warehouseId + 1,
+      //   ]);
 
-        data.warehouseId += 1;
-      }
+      //   data.warehouseId += 1;
+      // }
 
-      // Kurangi stok produk di table warehouse
-      let updateWarehouseStock = await query(scriptQuery1, [
-        getWarehouseStock[0].stock - data.cart[i].qty,
-        data.cart[i].id_produk,
-        data.warehouseId,
-      ]).catch((err) => {
-        throw err;
-      });
+      // // Kurangi stok produk di table warehouse
+      // let updateWarehouseStock = await query(scriptQuery1, [
+      //   getWarehouseStock[0].stock - data.cart[i].qty,
+      //   data.cart[i].id_produk,
+      //   data.warehouseId,
+      // ]).catch((err) => {
+      //   throw err;
+      // });
 
       // Ambil stock produk dari table produk
       let getProductStock = await query(scriptQuery6, [data.cart[i].id_produk]);
@@ -178,6 +178,40 @@ const getOngoingTransaction = async (req, res) => {
   }
 };
 
+const getOngoingTransactionUser = async (req, res) => {
+  let scriptQuery = `SELECT ts.id, total_price, t.id as transaction_id, transaction_date, proof FROM transaction t JOIN transaction_status ts ON t.id = ts.transaction_id 
+  JOIN payment_proof p ON p.transaction_id = t.id WHERE ts.status_id = 2 and t.user_id = ?`;
+
+  let scriptQuery1 = `SELECT td.product_name, product_qty, price FROM transaction_details td JOIN product p ON td.product_name = p.product_name WHERE td.transaction_id = ?`;
+
+  try {
+    let getTransactionData = await query(scriptQuery, req.user.id).catch(
+      (err) => {
+        throw err;
+      }
+    );
+
+    for (let i = 0; i < getTransactionData.length; i++) {
+      let getTransactionDetail = await query(
+        scriptQuery1,
+        getTransactionData[i].transaction_id
+      ).catch((err) => {
+        throw err;
+      });
+      getTransactionData[i].transaction_detail = getTransactionDetail;
+    }
+
+    res.status(200).send({
+      data: getTransactionData,
+    });
+  } catch (error) {
+    res.status(500).send({
+      error: true,
+      message: error.message,
+    });
+  }
+};
+
 const verifyPayment = async (req, res) => {
   let { transaction_id, status_id, id } = req.body;
 
@@ -252,4 +286,5 @@ module.exports = {
   getTransactionUser,
   getOngoingTransaction,
   verifyPayment,
+  getOngoingTransactionUser,
 };
